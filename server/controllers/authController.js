@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 exports.register = async (req, res) => {
-    try {
-            // get all the data from the frontend
+  try {
+    // get all the data from the frontend
     const { firstname, lastname, email, password } = req.body;
     // check that all the data should exist
     if (!(firstname && lastname && email && password)) {
@@ -34,31 +34,31 @@ exports.register = async (req, res) => {
       message: "You have successfully registered",
       user
     });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
 exports.login = async (req, res) => {
-    try {
-         //get all the data from frontend
-    const {email, password} = req.body;
+  try {
+    //get all the data from frontend
+    const { email, password } = req.body;
 
     //check that all the data should exist
-    if(!(email && password)){
+    if (!(email && password)) {
       return res.status(200).send("Please enter all information");
     }
 
     //Check if user already exists
-    user = await User.findOne({email});
-    if(!user){
+    user = await User.findOne({ email });
+    if (!user) {
       return res.status(200).send("User not found");
     }
 
     //match the password
     const enteredPassword = await bcrypt.compare(password, user.password);
-    if(!enteredPassword){
+    if (!enteredPassword) {
       return res.status(400).send("Password is incorrect");
     }
 
@@ -69,18 +69,18 @@ exports.login = async (req, res) => {
 
     //store cookies
     const options = {
-      expires: new Date(Date.now() + 1*24*60*60*1000),
+      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
       httpOnly: true, //Only manupulated by server not by frontend user
-        };
+    };
 
     //send the token
     res.status(200).cookie("token", token, options).json({
       message: "You hsve successfully logged in",
       success: true,
       token,
-    });         
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-    }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
