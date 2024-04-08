@@ -11,7 +11,6 @@ function ProblemsList() {
     const fetchProblems = async () => {
       try {
         const response = await axios.get('http://localhost:8080/problems/');
-        console.log("problems", response);
         setProblems(response.data); // Assuming the backend returns an array of problems
       } catch (error) {
         console.error('Failed to fetch problems:', error);
@@ -28,7 +27,7 @@ function ProblemsList() {
         problems.map((problem) => (
           <div key={problem._id} className="problem-item">
             <span className="problem-title">{problem.title}</span>
-            <Link to={`/problems/${problem._id}`} className="solve-button">Solve</Link>
+            <Link to={`/problem/${problem._id}`} className="solve-button">Solve</Link>
           </div>
         ))
       ) : (

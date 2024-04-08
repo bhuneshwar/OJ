@@ -20,7 +20,30 @@ exports.getAllProblems = async (req, res) => {
 
 exports.getProblemById = async (req, res) => {
     try {
-        // Your logic to fetch a problem by ID from the database
+        const problem = await Problem.findById(req.params.id);
+        if (!problem) {
+            return res.status(404).json({ message: 'Problem not found' });
+        }
+        res.json(problem);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+exports.runProblemById = async (req, res) => {
+    try {
+        // logic for compiling and running code with chosen particular language
+        
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+exports.submitProblemById = async (req, res) => {
+    try {
+        // logic for running testcases and if all passed then save it to database
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
