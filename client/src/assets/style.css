@@ -115,7 +115,7 @@
     border-radius: 4px;
   }
 
-  .code-editor textarea {
+  .code-editor textarea  {
     width: 100%;
     height: 300px;
     padding: 10px;
@@ -151,4 +151,31 @@
 
   .submit-button:hover {
     background-color: #74ba45;
+  }
+
+  .output-container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f4f4f4;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .output-container h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: bold;
+  }
+  
+  .output-container pre {
+    margin: 0;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+    overflow-x: auto;
   }

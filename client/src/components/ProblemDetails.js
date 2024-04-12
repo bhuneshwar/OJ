@@ -9,6 +9,7 @@ function ProblemDetails() {
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('c');
   const [output, setOutput] = useState('');
+  const [input, setInput] = useState('');
 
   useEffect(() => {
     const fetchProblemDetails = async () => {
@@ -36,11 +37,17 @@ function ProblemDetails() {
     // Handle code submission logic here
   };
 
+  const handleInputChange = (event) => {
+    // Handle input submission logic here
+    setInput(event.target.value);
+  };
+
   const handleRun = async () => {
     try {
       const response = await axios.post(`http://localhost:8080/problems/${id}/run`, {
         code,
         language,
+        input,
       });
       setOutput(response.data.output);
     } catch (error) {
@@ -73,9 +80,18 @@ function ProblemDetails() {
                 onChange={handleCodeChange}
                 placeholder="Write your code here"
               />
+              <textarea
+                value={input}
+                onChange={handleInputChange}
+                placeholder="Write your input here"
+              />
             </div>
             <button className="run-button" onClick={handleRun}>Run</button>
             <button className="submit-button" onClick={handleSubmit}>Submit</button>
+            <div className="output-container">
+              <h3>Output:</h3>
+              <pre>{output}</pre>
+            </div>
           </div>
         </>
       )}
