@@ -49,6 +49,7 @@ function ProblemDetails() {
         language,
         input,
       });
+      console.log("response", response);
       setOutput(response.data.output);
     } catch (error) {
       console.error('Error running code:', error);
