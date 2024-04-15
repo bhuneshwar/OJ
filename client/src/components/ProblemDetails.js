@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import '../assets/style.css'; // Make sure to import the CSS file
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { cpp } from '@codemirror/lang-cpp';
+import { java } from '@codemirror/lang-java';
+import '../assets/style.css';
 
 function ProblemDetails() {
   const { id } = useParams();
   const [problem, setProblem] = useState(null);
   const [code, setCode] = useState('');
-  const [language, setLanguage] = useState('c');
+  const [language, setLanguage] = useState('javascript');
   const [output, setOutput] = useState('');
   const [input, setInput] = useState('');
 
@@ -25,8 +30,8 @@ function ProblemDetails() {
     fetchProblemDetails();
   }, [id]);
 
-  const handleCodeChange = (event) => {
-    setCode(event.target.value);
+  const handleCodeChange = (value) => {
+    setCode(value);
   };
 
   const handleLanguageChange = (event) => {
@@ -38,7 +43,6 @@ function ProblemDetails() {
   };
 
   const handleInputChange = (event) => {
-    // Handle input submission logic here
     setInput(event.target.value);
   };
 
@@ -49,10 +53,25 @@ function ProblemDetails() {
         language,
         input,
       });
-      console.log("response", response);
+      console.log('response', response);
       setOutput(response.data.output);
     } catch (error) {
       console.error('Error running code:', error);
+    }
+  };
+
+  const getLanguageExtension = () => {
+    switch (language) {
+      case 'javascript':
+        return javascript();
+      case 'python':
+        return python();
+      case 'cpp':
+        return cpp();
+      case 'java':
+        return java();
+      default:
+        return null;
     }
   };
 
@@ -63,23 +82,22 @@ function ProblemDetails() {
           <div className="problem-description">
             <h2>{problem.title}</h2>
             <p>{problem.description}</p>
-            <p>Input : {problem.input}</p>
-            <p>Output : {problem.output}</p>
+            <p>Input: {problem.input}</p>
+            <p>Output: {problem.output}</p>
           </div>
           <div className="code-editor">
             <div className="code-editor">
               <select value={language} onChange={handleLanguageChange}>
-                <option value="c">C</option>
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
                 <option value="cpp">C++</option>
-                <option value="js">JavaScript</option>
-                <option value="py">Python</option>
                 <option value="java">Java</option>
-                {/* Add more language options as needed */}
               </select>
-              <textarea
+              <CodeMirror
                 value={code}
+                height="400px"
+                extensions={[getLanguageExtension()]}
                 onChange={handleCodeChange}
-                placeholder="Write your code here"
               />
               <textarea
                 value={input}
@@ -87,8 +105,12 @@ function ProblemDetails() {
                 placeholder="Write your input here"
               />
             </div>
-            <button className="run-button" onClick={handleRun}>Run</button>
-            <button className="submit-button" onClick={handleSubmit}>Submit</button>
+            <button className="run-button" onClick={handleRun}>
+              Run
+            </button>
+            <button className="submit-button" onClick={handleSubmit}>
+              Submit
+            </button>
             <div className="output-container">
               <h3>Output:</h3>
               <pre>{output}</pre>

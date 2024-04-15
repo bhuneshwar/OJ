@@ -37,6 +37,8 @@ exports.runProblemById = async (req, res) => {
         const { code, language, input } = req.body;
         const problemId = req.params.id;
 
+        console.log(code, language, input);
+
         const sanitizedProblemId = path.normalize(problemId).replace(/[^a-zA-Z0-9]/g, '');
         const directory = path.join(__dirname, 'code', sanitizedProblemId);
         if (!fs.existsSync(directory)) {
@@ -57,6 +59,8 @@ exports.runProblemById = async (req, res) => {
 
         const command = getExecutionCommand(language);
         const args = getExecutionArguments(language, filePath);
+        console.log(command);
+        console.log(args);
 
         const childProcess = spawn(command, args);
 
@@ -102,7 +106,7 @@ function getExtension(language) {
     switch (language) {
         case 'cpp':
             return 'cpp';
-        case 'py':
+        case 'python':
             return 'py';
         case 'java':
             return 'java';
@@ -115,7 +119,7 @@ function getExecutionCommand(language) {
     switch (language) {
         case 'cpp':
             return 'g++';
-        case 'py':
+        case 'python':
             return 'python';
         case 'java':
             return 'java';
@@ -128,7 +132,7 @@ function getExecutionArguments(language, filePath) {
     switch (language) {
         case 'cpp':
             return [filePath, '-o', 'output', '&&', './output'];
-        case 'py':
+        case 'python':
             return [filePath];
         case 'java':
             return [filePath];
