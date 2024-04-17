@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom'; 
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../assets/style.css';
+
+const axiosInstance = axios.create({
+  baseURL: 'http://localhost:8080',
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem('token')}`,
+  },
+});
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -11,7 +18,7 @@ function Login() {
   });
 
   const { email, password } = formData;
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,17 +27,14 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8080/auth/login', formData);
+      const response = await axiosInstance.post('/auth/login', formData);
       console.log(response.data.message);
       localStorage.setItem('token', response.data.token);
-      // Redirect or handle login success (e.g., store token, redirect to dashboard)
-      if(response.data.token){
+      if (response.data.token) {
         navigate('/problems');
       }
-      
     } catch (error) {
       console.error(error.response.data);
-      // Handle errors (e.g., show error message)
     }
   };
 
@@ -41,9 +45,8 @@ function Login() {
         <input type="password" name="password" value={password} onChange={handleChange} placeholder="Password" />
         <button type="submit" className="login-button">Login</button>
       </form>
-      {/* Add a Link to navigate to the Register page */}
       <div className="register-link">
-        <Link to="/register">Register</Link> {/* Use the path you provided for the Register page */}
+        <Link to="/register">Register</Link>
       </div>
     </div>
   );

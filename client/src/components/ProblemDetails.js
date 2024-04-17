@@ -8,6 +8,16 @@ import { cpp } from '@codemirror/lang-cpp';
 import { java } from '@codemirror/lang-java';
 import '../assets/style.css';
 
+const token = localStorage.getItem('token');
+console.log('Token:', token);
+
+const axiosInstance = axios.create({
+  baseURL: 'http://localhost:8080',
+  headers: {
+    Authorization: `Bearer ${localStorage.getItem('token')}`,
+  },
+});
+
 function ProblemDetails() {
   const { id } = useParams();
   const [problem, setProblem] = useState(null);
@@ -19,9 +29,8 @@ function ProblemDetails() {
   useEffect(() => {
     const fetchProblemDetails = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/problems/${id}`);
-        const data = await response.json();
-        setProblem(data);
+        const response = await axiosInstance.get(`/problems/${id}`);
+        setProblem(response.data);
       } catch (error) {
         console.error('Error fetching problem details:', error);
       }
@@ -48,7 +57,7 @@ function ProblemDetails() {
 
   const handleRun = async () => {
     try {
-      const response = await axios.post(`http://localhost:8080/problems/${id}/run`, {
+      const response = await axiosInstance.post(`/problems/${id}/run`, {
         code,
         language,
         input,

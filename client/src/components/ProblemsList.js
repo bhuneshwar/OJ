@@ -1,20 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios'; // Make sure to install and import axios
-import '../assets/style.css'; // Make sure to import the CSS file
+import axios from 'axios';
+import '../assets/style.css';
 
 function ProblemsList() {
   const [problems, setProblems] = useState([]);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch problems from the backend
     const fetchProblems = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/problems/');
-        setProblems(response.data); // Assuming the backend returns an array of problems
+        const axiosInstance = axios.create({
+          baseURL: 'http://localhost:8080',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        const response = await axiosInstance.get('/problems');
+        setProblems(response.data);
       } catch (error) {
         console.error('Failed to fetch problems:', error);
-        // Handle error (e.g., show error message)
+        setError('Failed to fetch problems. Please try again later.');
       }
     };
 
@@ -23,6 +29,7 @@ function ProblemsList() {
 
   return (
     <div className="problems-container">
+      {error && <p className="error-message">{error}</p>}
       {problems.length > 0 ? (
         problems.map((problem) => (
           <div key={problem._id} className="problem-item">
@@ -31,7 +38,7 @@ function ProblemsList() {
           </div>
         ))
       ) : (
-        <p>No problems found.</p> // Display a message if no problems are found
+        <p>No problems found.</p>
       )}
     </div>
   );
