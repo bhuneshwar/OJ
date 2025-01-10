@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
 const Problem = require('../models/Problem');
+const Solution = require('../models/Solution');
 
 exports.getAllProblems = async (req, res) => {
     try {
@@ -12,7 +13,20 @@ exports.getAllProblems = async (req, res) => {
         if (!problems || problems.length === 0) {
             return res.status(404).json({ message: 'No problems found' });
         }
-        res.status(200).json(problems);
+
+        // Get user's solved problems
+        const userSolutions = await Solution.find({ 
+            user: req.user._id,
+            status: 'Accepted'
+        }).distinct('problem');
+
+        // Add solved status to each problem
+        const problemsWithStatus = problems.map(problem => ({
+            ...problem._doc,
+            solved: userSolutions.includes(problem._id)
+        }));
+
+        res.status(200).json(problemsWithStatus);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -25,7 +39,17 @@ exports.getProblemById = async (req, res) => {
         if (!problem) {
             return res.status(404).json({ message: 'Problem not found' });
         }
-        res.json(problem);
+
+        // Get user's latest solution for this problem
+        const latestSolution = await Solution.findOne({
+            user: req.user._id,
+            problem: req.params.id
+        }).sort({ submittedAt: -1 });
+
+        res.json({
+            ...problem._doc,
+            userSolution: latestSolution
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
@@ -37,70 +61,277 @@ exports.runProblemById = async (req, res) => {
         const { code, language, input } = req.body;
         const problemId = req.params.id;
 
-        console.log(code, language, input);
-
-        const sanitizedProblemId = path.normalize(problemId).replace(/[^a-zA-Z0-9]/g, '');
-        const directory = path.join(__dirname, 'code', sanitizedProblemId);
-        if (!fs.existsSync(directory)) {
-            fs.mkdirSync(directory, { recursive: true });
+        // Input validation
+        if (!code || !language) {
+            return res.status(400).json({ error: 'Code and language are required' });
         }
 
+        // Create a temporary directory for the code
         const timestamp = Date.now();
+        const tempDir = path.join(__dirname, 'temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Create the code file
         const fileName = `code_${timestamp}.${getExtension(language)}`;
-        const filePath = path.join(directory, fileName);
+        const filePath = path.join(tempDir, fileName);
+        fs.writeFileSync(filePath, code);
+
+        let executionOutput = {
+            status: 'success',
+            stdout: '',
+            stderr: '',
+            executionTime: 0
+        };
+
+        const startTime = process.hrtime();
 
         try {
-            fs.writeFileSync(filePath, code);
-            console.log("Code file written successfully");
-        } catch (error) {
-            console.error("Error writing code file:", error);
-            return res.status(500).json({ error: 'Server error' });
-        }
+            if (language === 'python') {
+                const pythonProcess = spawn('python', [filePath]);
+                
+                if (input) {
+                    pythonProcess.stdin.write(input);
+                    pythonProcess.stdin.end();
+                }
 
-        const command = getExecutionCommand(language);
-        const args = getExecutionArguments(language, filePath);
-        console.log(command);
-        console.log(args);
+                const outputPromise = new Promise((resolve, reject) => {
+                    let stdout = '';
+                    let stderr = '';
+                    
+                    pythonProcess.stdout.on('data', (data) => {
+                        stdout += data.toString();
+                    });
 
-        const childProcess = spawn(command, args);
+                    pythonProcess.stderr.on('data', (data) => {
+                        stderr += data.toString();
+                    });
 
-        if (input) {
-            childProcess.stdin.write(input);
-            childProcess.stdin.end();
-        }
+                    pythonProcess.on('close', (code) => {
+                        const endTime = process.hrtime(startTime);
+                        const executionTime = endTime[0] * 1000 + endTime[1] / 1000000; // Convert to milliseconds
 
-        let output = '';
-        let error = '';
+                        resolve({
+                            status: code === 0 ? 'success' : 'error',
+                            stdout: stdout.trim(),
+                            stderr: stderr.trim(),
+                            executionTime: executionTime.toFixed(2)
+                        });
+                    });
 
-        childProcess.stdout.on('data', (data) => {
-            output += data.toString();
-        });
+                    pythonProcess.on('error', (error) => {
+                        reject(error);
+                    });
 
-        childProcess.stderr.on('data', (data) => {
-            error += data.toString();
-        });
+                    // Set timeout for execution (5 seconds)
+                    setTimeout(() => {
+                        pythonProcess.kill();
+                        reject(new Error('Execution timed out'));
+                    }, 5000);
+                });
 
-        childProcess.on('close', (code) => {
-            if (code === 0) {
-                res.json({ output: output.trim() });
+                executionOutput = await outputPromise;
             } else {
-                res.status(400).json({ error });
+                throw new Error('Unsupported language');
             }
-        });
+
+            // Clean up the temporary file
+            fs.unlinkSync(filePath);
+
+            res.json(executionOutput);
+        } catch (error) {
+            // Clean up the temporary file
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+
+            res.status(400).json({
+                status: 'error',
+                error: error.message,
+                stderr: executionOutput.stderr
+            });
+        }
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Server error:', error);
+        res.status(500).json({ 
+            status: 'error',
+            error: 'Server error occurred while executing the code'
+        });
     }
 };
 
 exports.submitProblemById = async (req, res) => {
     try {
-        // logic for running testcases and if all passed then save it to database
+        const { code, language } = req.body;
+        const problemId = req.params.id;
+
+        // First run the code
+        const executionResult = await runCode(code, language, problemId);
+        
+        // Save the solution
+        const solution = new Solution({
+            user: req.user._id,
+            problem: problemId,
+            code,
+            language,
+            status: executionResult.status === 'success' ? 'Accepted' : 'Runtime Error',
+            executionTime: executionResult.executionTime
+        });
+
+        await solution.save();
+
+        res.json({
+            ...executionResult,
+            solutionId: solution._id
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
     }
 };
+
+exports.getSolutionsByProblemId = async (req, res) => {
+    try {
+        const solutions = await Solution.find({ 
+            problem: req.params.id,
+            status: 'Accepted'
+        })
+        .populate('user', 'username')
+        .sort({ executionTime: 1 })
+        .limit(10);
+
+        res.json(solutions);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+exports.getUserSolutions = async (req, res) => {
+    try {
+        const solutions = await Solution.find({ 
+            user: req.user._id 
+        })
+        .populate('problem', 'title difficulty')
+        .sort({ submittedAt: -1 });
+
+        res.json(solutions);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+exports.getUserSolutionForProblem = async (req, res) => {
+    try {
+        const solution = await Solution.findOne({
+            user: req.user._id,
+            problem: req.params.id,
+            status: 'Accepted'
+        }).sort({ submittedAt: -1 });
+
+        if (!solution) {
+            return res.status(404).json({ message: 'No solution found' });
+        }
+
+        res.json(solution);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+// Helper function to run code
+async function runCode(code, language, problemId) {
+    // Your existing code execution logic here
+    // Return format should be:
+    // {
+    //     status: 'success' | 'error',
+    //     stdout: string,
+    //     stderr: string,
+    //     executionTime: number
+    // }
+    const timestamp = Date.now();
+    const tempDir = path.join(__dirname, 'temp');
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const fileName = `code_${timestamp}.${getExtension(language)}`;
+    const filePath = path.join(tempDir, fileName);
+    fs.writeFileSync(filePath, code);
+
+    let executionOutput = {
+        status: 'success',
+        stdout: '',
+        stderr: '',
+        executionTime: 0
+    };
+
+    const startTime = process.hrtime();
+
+    try {
+        if (language === 'python') {
+            const pythonProcess = spawn('python', [filePath]);
+            
+            const outputPromise = new Promise((resolve, reject) => {
+                let stdout = '';
+                let stderr = '';
+                
+                pythonProcess.stdout.on('data', (data) => {
+                    stdout += data.toString();
+                });
+
+                pythonProcess.stderr.on('data', (data) => {
+                    stderr += data.toString();
+                });
+
+                pythonProcess.on('close', (code) => {
+                    const endTime = process.hrtime(startTime);
+                    const executionTime = endTime[0] * 1000 + endTime[1] / 1000000; // Convert to milliseconds
+
+                    resolve({
+                        status: code === 0 ? 'success' : 'error',
+                        stdout: stdout.trim(),
+                        stderr: stderr.trim(),
+                        executionTime: executionTime.toFixed(2)
+                    });
+                });
+
+                pythonProcess.on('error', (error) => {
+                    reject(error);
+                });
+
+                // Set timeout for execution (5 seconds)
+                setTimeout(() => {
+                    pythonProcess.kill();
+                    reject(new Error('Execution timed out'));
+                }, 5000);
+            });
+
+            executionOutput = await outputPromise;
+        } else {
+            throw new Error('Unsupported language');
+        }
+
+        // Clean up the temporary file
+        fs.unlinkSync(filePath);
+
+        return executionOutput;
+    } catch (error) {
+        // Clean up the temporary file
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        return {
+            status: 'error',
+            error: error.message,
+            stderr: executionOutput.stderr
+        };
+    }
+}
 
 function getExtension(language) {
     switch (language) {

@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import '../assets/style.css';
-
-const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080',
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem('token')}`,
-  },
-});
+import { 
+  Container, 
+  Paper, 
+  TextField, 
+  Button, 
+  Typography, 
+  Box,
+  Avatar,
+  Link as MuiLink
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { useSnackbar } from 'notistack';
 
 function Login() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
-
   const { email, password } = formData;
   const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,28 +30,80 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axiosInstance.post('/auth/login', formData);
-      console.log(response.data.message);
-      localStorage.setItem('token', response.data.token);
+      const response = await axios.post('http://localhost:8080/auth/login', formData);
       if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        // Update axios default headers for future requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        enqueueSnackbar('Login successful!', { variant: 'success' });
         navigate('/problems');
+      } else {
+        enqueueSnackbar(response.data || 'Login failed', { variant: 'error' });
       }
     } catch (error) {
-      console.error(error.response.data);
+      enqueueSnackbar(error.response?.data || 'Login failed', { variant: 'error' });
     }
   };
 
   return (
-    <div className="login-container">
-      <form onSubmit={handleSubmit}>
-        <input type="email" name="email" value={email} onChange={handleChange} placeholder="Email" />
-        <input type="password" name="password" value={password} onChange={handleChange} placeholder="Password" />
-        <button type="submit" className="login-button">Login</button>
-      </form>
-      <div className="register-link">
-        <Link to="/register">Register</Link>
-      </div>
-    </div>
+    <Container component="main" maxWidth="xs">
+      <Box
+        sx={{
+          marginTop: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
+          <LockOutlinedIcon />
+        </Avatar>
+        <Typography component="h1" variant="h5">
+          Sign in
+        </Typography>
+        <Paper elevation={3} sx={{ p: 4, width: '100%', mt: 2 }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={handleChange}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={handleChange}
+            />
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              sx={{ mt: 3, mb: 2 }}
+            >
+              Sign In
+            </Button>
+            <Box sx={{ textAlign: 'center' }}>
+              <MuiLink component={Link} to="/register" variant="body2">
+                {"Don't have an account? Sign Up"}
+              </MuiLink>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+    </Container>
   );
 }
 

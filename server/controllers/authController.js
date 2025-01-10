@@ -5,82 +5,97 @@ const User = require('../models/User');
 
 exports.register = async (req, res) => {
   try {
-    // get all the data from the frontend
-    const { firstname, lastname, email, password } = req.body;
-    // check that all the data should exist
-    if (!(firstname && lastname && email && password)) {
-      return res.status(400).send("Please enter all the information");
-    }
-    // check if the user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(200).send("User already exists");
+    const { username, firstname, lastname, email, password } = req.body;
+
+    // Validate required fields
+    if (!(username && firstname && lastname && email && password)) {
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    // encrypt the password
+    // Check if user already exists
+    const existingUser = await User.findOne({ 
+      $or: [{ email }, { username }] 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: existingUser.email === email ? "Email already exists" : "Username already exists" 
+      });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    // save the user in the database and await the result
+
+    // Create user
     const user = await User.create({
+      username,
       firstname,
       lastname,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword
     });
-    // generate the token for the user and send it
-    const token = jwt.sign({ id: user._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
-    user.token = token;
-    user.password = undefined;
-    res.status(200).json({
-      message: "You have successfully registered",
-      user
+
+    // Generate token
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.SECRET_KEY,
+      { expiresIn: "24h" }
+    );
+
+    // Return user data (excluding password)
+    const userData = user.toObject();
+    delete userData.password;
+
+    res.status(201).json({
+      message: "Registration successful",
+      token,
+      user: userData
     });
   } catch (error) {
-    console.error(error);
+    console.error('Register error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
 exports.login = async (req, res) => {
   try {
-    //get all the data from frontend
     const { email, password } = req.body;
 
-    //check that all the data should exist
+    // Validate required fields
     if (!(email && password)) {
-      return res.status(200).send("Please enter all information");
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    //Check if user already exists
-    user = await User.findOne({ email });
+    // Find user
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(200).send("User not found");
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    //match the password
-    const enteredPassword = await bcrypt.compare(password, user.password);
-    if (!enteredPassword) {
-      return res.status(400).send("Password is incorrect");
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // generate the token for the user and send it
-    const token = jwt.sign({ id: user._id }, process.env.SECRET_KEY, { expiresIn: "1h" });
-    user.token = token;
-    user.password = undefined;
+    // Generate token
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.SECRET_KEY,
+      { expiresIn: "24h" }
+    );
 
-    //store cookies
-    const options = {
-      expires: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-      httpOnly: true, //Only manupulated by server not by frontend user
-    };
+    // Return user data (excluding password)
+    const userData = user.toObject();
+    delete userData.password;
 
-    //send the token
-    res.status(200).cookie("token", token, options).json({
-      message: "You hsve successfully logged in",
-      success: true,
+    res.status(200).json({
+      message: "Login successful",
       token,
+      user: userData
     });
   } catch (error) {
-    console.error(error);
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };

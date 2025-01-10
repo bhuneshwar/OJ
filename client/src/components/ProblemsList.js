@@ -1,46 +1,158 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import axios from 'axios';
-import '../assets/style.css';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  Chip,
+  Box,
+  CircularProgress,
+  TablePagination,
+} from '@mui/material';
+import { useSnackbar } from 'notistack';
+import Navbar from './Navbar';
+import axiosInstance from '../utils/axios';
 
 function ProblemsList() {
   const [problems, setProblems] = useState([]);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const navigate = useNavigate();
+  const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const axiosInstance = axios.create({
-          baseURL: 'http://localhost:8080',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
         const response = await axiosInstance.get('/problems');
         setProblems(response.data);
+        setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch problems:', error);
-        setError('Failed to fetch problems. Please try again later.');
+        enqueueSnackbar(error.response?.data || 'Error fetching problems', { 
+          variant: 'error' 
+        });
+        if (error.response?.status === 401) {
+          navigate('/');
+        }
       }
     };
 
     fetchProblems();
-  }, []);
+  }, [navigate, enqueueSnackbar]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const getDifficultyColor = (difficulty = 'Medium') => {
+    switch (difficulty?.toLowerCase()) {
+      case 'easy':
+        return 'success';
+      case 'medium':
+        return 'warning';
+      case 'hard':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="80vh"
+        >
+          <CircularProgress />
+        </Box>
+      </>
+    );
+  }
 
   return (
-    <div className="problems-container">
-      {error && <p className="error-message">{error}</p>}
-      {problems.length > 0 ? (
-        problems.map((problem) => (
-          <div key={problem._id} className="problem-item">
-            <span className="problem-title">{problem.title}</span>
-            <Link to={`/problem/${problem._id}`} className="solve-button">Solve</Link>
-          </div>
-        ))
-      ) : (
-        <p>No problems found.</p>
-      )}
-    </div>
+    <>
+      <Navbar />
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" gutterBottom component="h2">
+          Problems
+        </Typography>
+        <TableContainer component={Paper}>
+          <Table sx={{ minWidth: 650 }} aria-label="problems table">
+            <TableHead>
+              <TableRow>
+                <TableCell>Title</TableCell>
+                <TableCell align="right">Difficulty</TableCell>
+                <TableCell align="right">Acceptance Rate</TableCell>
+                <TableCell align="right">Submissions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {problems
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((problem) => (
+                  <TableRow
+                    key={problem._id}
+                    hover
+                    onClick={() => navigate(`/problem/${problem._id}`)}
+                    sx={{ cursor: 'pointer' }}
+                  >
+                    <TableCell component="th" scope="row">
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {problem.solved && (
+                          <Chip
+                            label="Solved"
+                            color="success"
+                            size="small"
+                            sx={{ mr: 1 }}
+                          />
+                        )}
+                        {problem.title}
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Chip
+                        label={problem.difficulty}
+                        color={getDifficultyColor(problem.difficulty)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {problem.acceptanceRate || '0'}%
+                    </TableCell>
+                    <TableCell align="right">
+                      {problem.submissions || 0}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={problems.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </TableContainer>
+      </Container>
+    </>
   );
 }
 
