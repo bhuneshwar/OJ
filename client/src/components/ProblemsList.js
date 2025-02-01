@@ -30,7 +30,7 @@ function ProblemsList() {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const response = await axiosInstance.get('/problems');
+        const response = await axiosInstance.get('/problems', { withCredentials: true });
         setProblems(response.data);
         setLoading(false);
       } catch (error) {
@@ -54,35 +54,6 @@ function ProblemsList() {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-
-  const getDifficultyColor = (difficulty = 'Medium') => {
-    switch (difficulty?.toLowerCase()) {
-      case 'easy':
-        return 'success';
-      case 'medium':
-        return 'warning';
-      case 'hard':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  if (loading) {
-    return (
-      <>
-        <Navbar />
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="80vh"
-        >
-          <CircularProgress />
-        </Box>
-      </>
-    );
-  }
 
   return (
     <>
@@ -111,32 +82,12 @@ function ProblemsList() {
                     onClick={() => navigate(`/problem/${problem._id}`)}
                     sx={{ cursor: 'pointer' }}
                   >
-                    <TableCell component="th" scope="row">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {problem.solved && (
-                          <Chip
-                            label="Solved"
-                            color="success"
-                            size="small"
-                            sx={{ mr: 1 }}
-                          />
-                        )}
-                        {problem.title}
-                      </Box>
-                    </TableCell>
+                    <TableCell component="th" scope="row">{problem.title}</TableCell>
                     <TableCell align="right">
-                      <Chip
-                        label={problem.difficulty}
-                        color={getDifficultyColor(problem.difficulty)}
-                        size="small"
-                      />
+                      <Chip label={problem.difficulty} color="primary" size="small" />
                     </TableCell>
-                    <TableCell align="right">
-                      {problem.acceptanceRate || '0'}%
-                    </TableCell>
-                    <TableCell align="right">
-                      {problem.submissions || 0}
-                    </TableCell>
+                    <TableCell align="right">{problem.acceptanceRate || '0'}%</TableCell>
+                    <TableCell align="right">{problem.submissions || 0}</TableCell>
                   </TableRow>
                 ))}
             </TableBody>

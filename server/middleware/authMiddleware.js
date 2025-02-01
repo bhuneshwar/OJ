@@ -1,20 +1,13 @@
-// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 exports.verifyToken = async (req, res, next) => {
     try {
-        const authHeader = req.headers['authorization'];
-        if (!authHeader) {
-            return res.status(401).json({ error: 'No token provided' });
-        }
+        const token = req.cookies.token; // Get token from cookies
 
-        // Check if the header follows the Bearer scheme
-        if (!authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Invalid token format' });
+        if (!token) {
+            return res.status(401).json({ error: 'Unauthorized: No token provided' });
         }
-
-        const token = authHeader.split(' ')[1];
 
         try {
             const decoded = jwt.verify(token, process.env.SECRET_KEY);

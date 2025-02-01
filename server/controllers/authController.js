@@ -1,4 +1,3 @@
-// controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
@@ -21,24 +20,18 @@ exports.register = async (req, res) => {
   try {
     const { firstname, lastname, email, password } = req.body;
 
-    // Validate required fields
     if (!(firstname && lastname && email && password)) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ error: "User already exists" });
     }
 
-    // Generate a unique username
     const username = await generateUsername(firstname, lastname);
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const newUser = await User.create({
       username,
       firstname,
@@ -47,10 +40,16 @@ exports.register = async (req, res) => {
       password: hashedPassword,
     });
 
-    // Generate JWT token
     const token = jwt.sign({ id: newUser._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
-    res.status(201).json({ message: "Registration successful", token, username });
+    // Securely set the cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true, // Use true if deployed with HTTPS
+      sameSite: "Lax",
+    });
+
+    res.status(201).json({ message: "Registration successful", username });
   } catch (error) {
     console.error("Error in register:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -62,29 +61,38 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!(email && password)) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate JWT token
     const token = jwt.sign({ id: user._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
-    res.status(200).json({ message: "Login successful", token, username: user.username });
+    // Securely set the cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true, // Use true if deployed with HTTPS
+      sameSite: "Lax",
+    });
+
+    res.status(200).json({ message: "Login successful", username: user.username });
   } catch (error) {
     console.error("Error in login:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
+};
+
+// Logout user
+exports.logout = async (req, res) => {
+  res.clearCookie("token");
+  res.status(200).json({ message: "Logout successful" });
 };
