@@ -59,27 +59,35 @@ function ProblemDetails() {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const response = await axiosInstance.get(`/problems/${id}`);
-        setProblem(response.data);
-        
-        if (response.data.userSolution) {
-          setCode(response.data.userSolution.code);
-          setLanguage(response.data.userSolution.language);
-        } else {
-          setCode(defaultCode[language]);
-        }
-        
-        setLoading(false);
+          const response = await axiosInstance.get(`/problems/${id}`, { withCredentials: true });
+          console.log(response.data);
+  
+          setProblem(response.data.problem);
+  
+          if (response.data.userSolution) {
+              setLanguage(response.data.userSolution.language); // First, set language
+              setCode(response.data.userSolution.code); // Then, set code
+          } else {
+              setCode(defaultCode[language]);
+          }
+  
+          setLoading(false);
       } catch (error) {
-        enqueueSnackbar(error.response?.data || 'Error fetching problem', { variant: 'error' });
-        if (error.response?.status === 401) {
-          navigate('/');
-        }
+          enqueueSnackbar(error.response?.data || 'Error fetching problem', { variant: 'error' });
+          if (error.response?.status === 401) {
+              navigate('/');
+          }
       }
     };
   
     fetchProblem();
-  }, [id, language, navigate, enqueueSnackbar]);
+  }, [id, navigate, enqueueSnackbar]);
+
+  useEffect(() => {
+    if (!problem?.userSolution) {
+      setCode(defaultCode[language]); // Update only if no previous solution
+    }
+  }, [language]);
 
   const handleLanguageChange = (event) => {
     const newLanguage = event.target.value;
@@ -246,7 +254,8 @@ function ProblemDetails() {
               </Box>
 
               <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                <CodeMirror
+              <CodeMirror
+                  key={`${id}-${language}`} // Forces re-render when language changes
                   value={code}
                   height="70vh"
                   theme="dark"

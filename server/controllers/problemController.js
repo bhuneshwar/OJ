@@ -40,21 +40,24 @@ exports.getProblemById = async (req, res) => {
             return res.status(404).json({ message: 'Problem not found' });
         }
 
-        // Get user's latest solution for this problem
-        const latestSolution = await Solution.findOne({
-            user: req.user._id,
-            problem: req.params.id
-        }).sort({ submittedAt: -1 });
+        console.log("User ID from authMiddleware:", req.user?._id); // Debugging
 
-        res.json({
-            ...problem._doc,
-            userSolution: latestSolution
-        });
+        if (!req.user) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const userSolution = await Solution.findOne({
+            user: req.user._id, 
+            problem: req.params.id,
+        }).sort({ createdAt: -1 });
+
+        res.json({ problem, userSolution });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error fetching problem:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 };
+
 
 exports.runProblemById = async (req, res) => {
     try {
