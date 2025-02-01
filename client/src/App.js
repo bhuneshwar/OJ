@@ -7,6 +7,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ProblemsList from './components/ProblemsList';
 import ProblemDetails from './components/ProblemDetails';
+import Leaderboard from './components/Leaderboard';
 
 const theme = createTheme({
   palette: {
@@ -33,6 +34,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/problems" element={<ProblemsList />} />
               <Route path="/problem/:id" element={<ProblemDetails />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               {/* Additional routes can be added here */}
             </Routes>
           </div>

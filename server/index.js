@@ -7,6 +7,7 @@ require('dotenv').config();
 const { DBConnection } = require('./database/db');
 const authRoutes = require('./routes/authRoutes'); // Import auth routes
 const problemRoutes = require('./routes/problemRoutes'); // Import problem routes
+const leaderboardRoutes = require('./routes/leaderboardRoutes');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -28,6 +29,7 @@ app.use(cors({
 // Routes
 app.use('/auth', authRoutes);
 app.use('/problems', problemRoutes);
+app.use('/', leaderboardRoutes);
 
 // Start Server
 app.listen(port, () => {

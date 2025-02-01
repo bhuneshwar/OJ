@@ -45,6 +45,9 @@ function Navbar() {
           >
             Online Judge
           </Typography>
+          <Button color="inherit" onClick={() => navigate('/leaderboard')}>
+            Leaderboard
+          </Button>
           <Button
             color="inherit"
             onClick={handleLogout}
