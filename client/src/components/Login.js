@@ -30,20 +30,15 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8080/auth/login', formData);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        // Update axios default headers for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        enqueueSnackbar('Login successful!', { variant: 'success' });
-        navigate('/problems');
-      } else {
-        enqueueSnackbar(response.data || 'Login failed', { variant: 'error' });
-      }
+      const response = await axios.post('http://localhost:8080/auth/login', formData, { withCredentials: true });
+  
+      enqueueSnackbar('Login successful!', { variant: 'success' });
+      navigate('/problems');
     } catch (error) {
       enqueueSnackbar(error.response?.data || 'Login failed', { variant: 'error' });
     }
   };
+  
 
   return (
     <Container component="main" maxWidth="xs">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   AppBar,
   Box,
@@ -16,8 +17,8 @@ function Navbar() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await axios.post('http://localhost:8080/auth/logout', {}, { withCredentials: true });
     enqueueSnackbar('Logged out successfully', { variant: 'success' });
     navigate('/');
   };

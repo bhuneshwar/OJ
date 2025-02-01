@@ -45,8 +45,8 @@ exports.register = async (req, res) => {
     // Securely set the cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: true, // Use true if deployed with HTTPS
-      sameSite: "Lax",
+      secure: true, // Must be true in production (HTTPS)
+      sameSite: "None", // Required for cross-origin cookies
     });
 
     res.status(201).json({ message: "Registration successful", username });
@@ -77,11 +77,10 @@ exports.login = async (req, res) => {
 
     const token = jwt.sign({ id: user._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
-    // Securely set the cookie
     res.cookie("token", token, {
       httpOnly: true,
-      secure: true, // Use true if deployed with HTTPS
-      sameSite: "Lax",
+      secure: true, // Must be true in production (HTTPS)
+      sameSite: "None", // Required for cross-origin cookies
     });
 
     res.status(200).json({ message: "Login successful", username: user.username });

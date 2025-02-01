@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axiosInstance from '../utils/axios'; // Import axiosInstance instead of axios
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -25,13 +25,6 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SendIcon from '@mui/icons-material/Send';
 import { useSnackbar } from 'notistack';
 import Navbar from './Navbar';
-
-const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080',
-  headers: {
-    Authorization: `Bearer ${localStorage.getItem('token')}`,
-  },
-});
 
 const languageExtensions = {
   javascript: javascript(),
@@ -69,7 +62,6 @@ function ProblemDetails() {
         const response = await axiosInstance.get(`/problems/${id}`);
         setProblem(response.data);
         
-        // If user has a previous solution, load it
         if (response.data.userSolution) {
           setCode(response.data.userSolution.code);
           setLanguage(response.data.userSolution.language);
@@ -79,15 +71,13 @@ function ProblemDetails() {
         
         setLoading(false);
       } catch (error) {
-        enqueueSnackbar(error.response?.data || 'Error fetching problem', { 
-          variant: 'error' 
-        });
+        enqueueSnackbar(error.response?.data || 'Error fetching problem', { variant: 'error' });
         if (error.response?.status === 401) {
           navigate('/');
         }
       }
     };
-
+  
     fetchProblem();
   }, [id, language, navigate, enqueueSnackbar]);
 
@@ -258,7 +248,7 @@ function ProblemDetails() {
               <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                 <CodeMirror
                   value={code}
-                  height="100%"
+                  height="70vh"
                   theme="dark"
                   extensions={[languageExtensions[language]]}
                   onChange={(value) => setCode(value)}
