@@ -3,99 +3,88 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// Function to generate a unique username
+const generateUsername = async (firstname, lastname) => {
+  let baseUsername = `${firstname.toLowerCase()}_${lastname.toLowerCase()}`;
+  let username = baseUsername;
+  let counter = 1;
+
+  while (await User.findOne({ username })) {
+    username = `${baseUsername}${counter}`; // Add a counter if username exists
+    counter++;
+  }
+  return username;
+};
+
+// Register user
 exports.register = async (req, res) => {
   try {
-    const { username, firstname, lastname, email, password } = req.body;
+    const { firstname, lastname, email, password } = req.body;
 
     // Validate required fields
-    if (!(username && firstname && lastname && email && password)) {
+    if (!(firstname && lastname && email && password)) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
-    });
-    
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ 
-        error: existingUser.email === email ? "Email already exists" : "Username already exists" 
-      });
+      return res.status(409).json({ error: "User already exists" });
     }
+
+    // Generate a unique username
+    const username = await generateUsername(firstname, lastname);
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await User.create({
+    const newUser = await User.create({
       username,
       firstname,
       lastname,
-      email: email.toLowerCase(),
-      password: hashedPassword
+      email,
+      password: hashedPassword,
     });
 
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.SECRET_KEY,
-      { expiresIn: "24h" }
-    );
+    // Generate JWT token
+    const token = jwt.sign({ id: newUser._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
-    // Return user data (excluding password)
-    const userData = user.toObject();
-    delete userData.password;
-
-    res.status(201).json({
-      message: "Registration successful",
-      token,
-      user: userData
-    });
+    res.status(201).json({ message: "Registration successful", token, username });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error in register:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
+// Login user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate required fields
+    // Validate input
     if (!(email && password)) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
+    // Check if user exists
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Generate token
-    const token = jwt.sign(
-      { id: user._id, email: user.email },
-      process.env.SECRET_KEY,
-      { expiresIn: "24h" }
-    );
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id, email }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
-    // Return user data (excluding password)
-    const userData = user.toObject();
-    delete userData.password;
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: userData
-    });
+    res.status(200).json({ message: "Login successful", token, username: user.username });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error in login:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
