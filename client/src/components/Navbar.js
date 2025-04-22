@@ -18,7 +18,7 @@ function Navbar() {
   const { enqueueSnackbar } = useSnackbar();
 
   const handleLogout = async () => {
-    await axios.post('http://localhost:8080/auth/logout', {}, { withCredentials: true });
+    await axios.post('http://localhost:5000/auth/logout', {}, { withCredentials: true });
     enqueueSnackbar('Logged out successfully', { variant: 'success' });
     navigate('/');
   };

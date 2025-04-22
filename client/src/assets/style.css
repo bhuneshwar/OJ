@@ -179,3 +179,23 @@
     white-space: pre-wrap;
     overflow-x: auto;
   }
+
+
+  .leaderboard-table {
+    scrollbar-width: thin;
+    scrollbar-color: #2196f3 transparent;
+  }
+  
+  .leaderboard-table::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .leaderboard-table::-webkit-scrollbar-thumb {
+    background-color: #2196f3;
+    border-radius: 4px;
+  }
+  
+  .leaderboard-table::-webkit-scrollbar-track {
+    background-color: transparent;
+  }

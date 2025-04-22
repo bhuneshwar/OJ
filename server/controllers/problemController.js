@@ -6,6 +6,8 @@ const path = require('path');
 const cron = require('node-cron');
 const Problem = require('../models/Problem');
 const Solution = require('../models/Solution');
+const amqp = require('amqplib');
+const Docker = require('dockerode');
 
 exports.getAllProblems = async (req, res) => {
     try {
@@ -59,6 +61,7 @@ exports.getProblemById = async (req, res) => {
 };
 
 
+// Controller to run code (publishes task to RabbitMQ)
 exports.runProblemById = async (req, res) => {
     try {
         const { code, language, input } = req.body;
@@ -69,100 +72,32 @@ exports.runProblemById = async (req, res) => {
             return res.status(400).json({ error: 'Code and language are required' });
         }
 
-        // Create a temporary directory for the code
-        const timestamp = Date.now();
-        const tempDir = path.join(__dirname, 'temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
+        // Connect to RabbitMQ
+        const connection = await amqp.connect(process.env.RABBITMQ_URL);
+        const channel = await connection.createChannel();
+        const queue = 'code_execution_queue';
 
-        // Create the code file
-        const fileName = `code_${timestamp}.${getExtension(language)}`;
-        const filePath = path.join(tempDir, fileName);
-        fs.writeFileSync(filePath, code);
+        // Ensure the queue exists
+        await channel.assertQueue(queue, { durable: true });
 
-        let executionOutput = {
-            status: 'success',
-            stdout: '',
-            stderr: '',
-            executionTime: 0
-        };
+        // Publish the task to the queue
+        const task = { code, language, input, problemId, userId: req.user._id };
+        channel.sendToQueue(queue, Buffer.from(JSON.stringify(task)), { persistent: true });
 
-        const startTime = process.hrtime();
+        // Close the connection
+        await channel.close();
+        await connection.close();
 
-        try {
-            if (language === 'python') {
-                const pythonProcess = spawn('python', [filePath]);
-                
-                if (input) {
-                    pythonProcess.stdin.write(input);
-                    pythonProcess.stdin.end();
-                }
-
-                const outputPromise = new Promise((resolve, reject) => {
-                    let stdout = '';
-                    let stderr = '';
-                    
-                    pythonProcess.stdout.on('data', (data) => {
-                        stdout += data.toString();
-                    });
-
-                    pythonProcess.stderr.on('data', (data) => {
-                        stderr += data.toString();
-                    });
-
-                    pythonProcess.on('close', (code) => {
-                        const endTime = process.hrtime(startTime);
-                        const executionTime = endTime[0] * 1000 + endTime[1] / 1000000; // Convert to milliseconds
-
-                        resolve({
-                            status: code === 0 ? 'success' : 'error',
-                            stdout: stdout.trim(),
-                            stderr: stderr.trim(),
-                            executionTime: executionTime.toFixed(2)
-                        });
-                    });
-
-                    pythonProcess.on('error', (error) => {
-                        reject(error);
-                    });
-
-                    // Set timeout for execution (5 seconds)
-                    setTimeout(() => {
-                        pythonProcess.kill();
-                        reject(new Error('Execution timed out'));
-                    }, 5000);
-                });
-
-                executionOutput = await outputPromise;
-            } else {
-                throw new Error('Unsupported language');
-            }
-
-            // Clean up the temporary file
-            fs.unlinkSync(filePath);
-
-            res.json(executionOutput);
-        } catch (error) {
-            // Clean up the temporary file
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
-
-            res.status(400).json({
-                status: 'error',
-                error: error.message,
-                stderr: executionOutput.stderr
-            });
-        }
+        res.json({ status: 'success', message: 'Code execution task submitted' });
     } catch (error) {
         console.error('Server error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             status: 'error',
-            error: 'Server error occurred while executing the code'
+            error: 'Server error occurred while submitting the task'
         });
     }
 };
+
 
 exports.submitProblemById = async (req, res) => {
     try {
@@ -179,7 +114,8 @@ exports.submitProblemById = async (req, res) => {
             code,
             language,
             status: executionResult.status === 'success' ? 'Accepted' : 'Runtime Error',
-            executionTime: executionResult.executionTime
+            executionTime: executionResult.executionTime,
+            memoryUsage: executionResult.memoryUsage
         });
 
         await solution.save();
@@ -247,16 +183,10 @@ exports.getUserSolutionForProblem = async (req, res) => {
 
 // Helper function to run code
 async function runCode(code, language, problemId) {
-    // Your existing code execution logic here
-    // Return format should be:
-    // {
-    //     status: 'success' | 'error',
-    //     stdout: string,
-    //     stderr: string,
-    //     executionTime: number
-    // }
+    const docker = new Docker();
     const timestamp = Date.now();
     const tempDir = path.join(__dirname, 'temp');
+
     if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -269,79 +199,138 @@ async function runCode(code, language, problemId) {
         status: 'success',
         stdout: '',
         stderr: '',
-        executionTime: 0
+        executionTime: 0,
+        memoryUsage: 0
     };
 
     const startTime = process.hrtime();
 
     try {
-        if (language === 'python') {
-            const pythonProcess = spawn('python', [filePath]);
-            
-            const outputPromise = new Promise((resolve, reject) => {
-                let stdout = '';
-                let stderr = '';
-                
-                pythonProcess.stdout.on('data', (data) => {
-                    stdout += data.toString();
-                });
-
-                pythonProcess.stderr.on('data', (data) => {
-                    stderr += data.toString();
-                });
-
-                pythonProcess.on('close', (code) => {
-                    const endTime = process.hrtime(startTime);
-                    const executionTime = endTime[0] * 1000 + endTime[1] / 1000000; // Convert to milliseconds
-
-                    resolve({
-                        status: code === 0 ? 'success' : 'error',
-                        stdout: stdout.trim(),
-                        stderr: stderr.trim(),
-                        executionTime: executionTime.toFixed(2)
-                    });
-                });
-
-                pythonProcess.on('error', (error) => {
-                    reject(error);
-                });
-
-                // Set timeout for execution (5 seconds)
-                setTimeout(() => {
-                    pythonProcess.kill();
-                    reject(new Error('Execution timed out'));
-                }, 5000);
-            });
-
-            executionOutput = await outputPromise;
-        } else {
-            throw new Error('Unsupported language');
+        // Define language-specific commands
+        let cmd;
+        switch (language) {
+            case 'python':
+                cmd = ['python', filePath];
+                break;
+            case 'javascript':
+                cmd = ['node', filePath];
+                break;
+            case 'cpp':
+                // Compile and run C++ code
+                const compiledFileName = `output_${timestamp}`;
+                const compiledFilePath = path.join(tempDir, compiledFileName);
+                cmd = ['sh', '-c', `g++ ${filePath} -o ${compiledFilePath} && ${compiledFilePath}`];
+                break;
+            case 'java':
+                // Compile and run Java code
+                const className = fileName.replace('.java', '');
+                cmd = ['sh', '-c', `javac ${filePath} && java -cp ${tempDir} ${className}`];
+                break;
+            default:
+                throw new Error('Unsupported language');
         }
 
-        // Clean up the temporary file
-        fs.unlinkSync(filePath);
+        // Create a directory for this execution in the temp directory
+        const executionDir = path.join(tempDir, `exec_${timestamp}`);
+        if (!fs.existsSync(executionDir)) {
+            fs.mkdirSync(executionDir, { recursive: true });
+        }
+        
+        // Move the file to the execution directory
+        const newFilePath = path.join(executionDir, fileName);
+        fs.renameSync(filePath, newFilePath);
+        
+        // Create and start Docker container
+        const container = await docker.createContainer({
+            Image: 'code-execution', // Ensure this image has all required compilers/tools
+            // Construct the proper command based on language
+            Cmd: ['bash', '-c', `cd /app/code && /app/run_with_metrics ${language === 'cpp' ? 
+                `g++ ${fileName} -o output && ./output` : 
+                language === 'java' ? 
+                `javac ${fileName} && java -cp . ${fileName.replace('.java', '')}` : 
+                language === 'python' ? 
+                `python3 ${fileName}` : 
+                `node ${fileName}`}`],
+            HostConfig: {
+                Memory: 256 * 1024 * 1024, // 256MB memory limit
+                CpuPeriod: 100000,
+                CpuQuota: 50000, // 50% CPU limit
+                Binds: [`${executionDir}:/app/code`] // Mount the execution directory
+            },
+            WorkingDir: '/app/code'
+        });
 
-        return executionOutput;
+        await container.start();
+
+        const output = await container.wait();
+        const logs = await container.logs({ stdout: true, stderr: true });
+        
+        // Parse execution time and memory usage from logs
+        const logOutput = logs.toString();
+        let containerExecutionTime = 0;
+        let memoryUsage = 0;
+        
+        const timeMatch = logOutput.match(/EXECUTION_TIME=([0-9.]+)/);
+        if (timeMatch && timeMatch[1]) {
+            containerExecutionTime = parseFloat(timeMatch[1]);
+        }
+        
+        const memoryMatch = logOutput.match(/MEMORY_USAGE=([0-9]+)/);
+        if (memoryMatch && memoryMatch[1]) {
+            memoryUsage = parseInt(memoryMatch[1]);
+        }
+
+        const endTime = process.hrtime(startTime);
+        const totalExecutionTime = endTime[0] * 1000 + endTime[1] / 1000000; // Convert to milliseconds
+
+        // Clean up the log output to remove the metrics lines
+        let cleanOutput = logOutput.replace(/EXECUTION_TIME=([0-9.]+)\n?/g, '');
+        cleanOutput = cleanOutput.replace(/MEMORY_USAGE=([0-9]+)\n?/g, '');
+        
+        executionOutput = {
+            status: output.StatusCode === 0 ? 'success' : 'error',
+            stdout: cleanOutput,
+            stderr: '',
+            executionTime: containerExecutionTime > 0 ? containerExecutionTime.toFixed(2) : totalExecutionTime.toFixed(2),
+            memoryUsage: memoryUsage / 1024 // Convert to MB
+        };
+
+        await container.remove();
     } catch (error) {
-        // Clean up the temporary file
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-
-        return {
+        executionOutput = {
             status: 'error',
             error: error.message,
-            stderr: executionOutput.stderr
+            stderr: error.message,
+            executionTime: 0,
+            memoryUsage: 0
         };
+    } finally {
+        // Clean up the temporary files and directories
+        try {
+            // Clean up the execution directory
+            if (fs.existsSync(executionDir)) {
+                const files = fs.readdirSync(executionDir);
+                files.forEach(file => {
+                    fs.unlinkSync(path.join(executionDir, file));
+                });
+                fs.rmdirSync(executionDir);
+            }
+        } catch (cleanupError) {
+            console.error('Error during cleanup:', cleanupError);
+        }
     }
+
+    return executionOutput;
 }
 
 function getExtension(language) {
     switch (language) {
-        case 'cpp':
-            return 'cpp';
         case 'python':
             return 'py';
+        case 'javascript':
+            return 'js';
+        case 'cpp':
+            return 'cpp';
         case 'java':
             return 'java';
         default:

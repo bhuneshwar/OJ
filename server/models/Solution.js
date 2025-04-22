@@ -29,6 +29,10 @@ const solutionSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    memoryUsage: {
+        type: Number,
+        required: true
+    },
     submittedAt: {
         type: Date,
         default: Date.now

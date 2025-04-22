@@ -10,7 +10,7 @@ const problemRoutes = require('./routes/problemRoutes'); // Import problem route
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 5000;
 
 // Connect to MongoDB
 DBConnection();
@@ -34,4 +34,10 @@ app.use('/', leaderboardRoutes);
 // Start Server
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+});
+
+// Start the code execution worker
+const { startWorker } = require('./workers/codeExecutionWorker');
+startWorker().catch(err => {
+    console.error('Failed to start worker:', err);
 });

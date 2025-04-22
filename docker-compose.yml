@@ -1,0 +1,58 @@
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"  # AMQP port
+      - "15672:15672"  # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password
+
+  backend:
+    build: ./server
+    container_name: backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/online-judge
+      - RABBITMQ_URL=amqp://admin:password@rabbitmq:5672
+      - SECRET_KEY=naliweufblaisjdfbiwueb
+    volumes:
+    - ./server:/app  # Mount the server directory for hot-reloading
+    command: npm run dev  # Use nodemon for development
+    depends_on:
+      - mongo
+      - rabbitmq
+
+  frontend:
+    build: ./client
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  code-execution:
+    build: ./code-execution
+    container_name: code-execution
+    environment:
+      - MEMORY_LIMIT=256M
+      - CPU_LIMIT=50
+      - RABBITMQ_URL=amqp://admin:password@rabbitmq:5672
+    volumes:
+      - ./code-execution:/app
+    depends_on:
+      - backend
+      - rabbitmq
+
+volumes:
+  mongo-data:

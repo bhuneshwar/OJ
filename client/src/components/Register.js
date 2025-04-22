@@ -16,7 +16,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useSnackbar } from 'notistack';
 
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: 'http://localhost:5000',
 });
 
 function Register() {
