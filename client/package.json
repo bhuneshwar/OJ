@@ -1,7 +1,14 @@
 {
-  "name": "test",
-  "version": "0.1.0",
+  "name": "agouni-online-judge",
+  "version": "1.0.0",
   "private": true,
+  "description": "Modern Online Judge Platform - AgoUni",
+  "keywords": [
+    "online-judge",
+    "coding",
+    "programming",
+    "contest"
+  ],
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.2",
     "@codemirror/lang-java": "^6.0.1",
@@ -11,16 +18,24 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.3.1",
     "@mui/material": "^6.3.1",
+    "@mui/x-charts": "^7.22.2",
+    "@mui/x-data-grid": "^7.22.2",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "@uiw/react-codemirror": "^4.21.25",
     "axios": "^1.6.8",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^11.15.0",
+    "lodash.debounce": "^4.0.8",
     "notistack": "^3.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
     "react-router-dom": "^6.22.3",
     "react-scripts": "5.0.1",
+    "react-split": "^2.0.14",
+    "recharts": "^2.15.4",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
